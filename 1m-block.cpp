@@ -21,11 +21,11 @@ using namespace std;
 unordered_set<string> blocked_sites;
 
 void load_blocked_sites(const char *filename) {
-    std::ifstream file(filename);
-    std::string line;
-    while (std::getline(file, line)) {
+    ifstream file(filename);
+    string line;
+    while (getline(file, line)) {
         size_t comma_pos = line.find(",");
-        if (comma_pos != std::string::npos) {
+        if (comma_pos != string::npos) {
             blocked_sites.insert(line.substr(comma_pos + 1));
         }
     }
