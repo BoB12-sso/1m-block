@@ -75,7 +75,7 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *
     if(!findhost)
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
-    findhost+=strlen("Host: "); //"Host: "
+    findhost+=strlen("Host: ");
     char* hostend = strstr(findhost, "\r\n");
 
     if(!hostend)
@@ -84,6 +84,7 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *
     string hostname(findhost, hostend - findhost); 
 
     //site compare
+    // not strstr..
     if(blocked_sites.find(hostname) != blocked_sites.end()){
         printf("block %s\n", hostname.c_str());
         return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
