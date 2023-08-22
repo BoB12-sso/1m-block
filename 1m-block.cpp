@@ -70,13 +70,13 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *
     if(!(packetlen>total_hdr_len+4 && packet[total_hdr_len]=='G'&&packet[total_hdr_len+1]=='E'&&packet[total_hdr_len+2]=='T'))
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
-    char *findhost = strnstr((char *)(packet + total_hdr_len), "Host: ", strlen("Host: "));
+    char *findhost = strstr((char *)(packet + total_hdr_len), "Host: ");
     
     if(!findhost)
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
     findhost+=6; //"Host: "
-    char* hostend = strnstr(findhost, "\r\n", strlen("\r\n"));
+    char* hostend = strstr(findhost, "\r\n");
 
     if(!hostend)
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
