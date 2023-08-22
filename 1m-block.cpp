@@ -75,7 +75,7 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *
     if(!findhost)
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
-    findhost+=6; //"Host: "
+    findhost+=strlen("Host: "); //"Host: "
     char* hostend = strstr(findhost, "\r\n");
 
     if(!hostend)
@@ -84,14 +84,17 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *
     string hostname(findhost, hostend - findhost); 
 
     //site compare
-    printf("site compare\n");
-    printf("%s!!\n", hostname.c_str()); // 수정된 부분
-
-    if(blocked_sites.find(hostname) != blocked_sites.end()){ // 수정된 부분
+    if(blocked_sites.find(hostname) != blocked_sites.end()){
         printf("block %s\n", hostname.c_str());
         return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
     }
     return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+}
+
+void init_pro(){
+    system("iptables -A OUTPUT -j NFQUEUE --queue-num 0");
+    system("iptables -A INPUT -j NFQUEUE --queue-num 0");
+    return;
 }
 
 void sig_handler(int signum){
@@ -100,12 +103,16 @@ void sig_handler(int signum){
     exit(0);
 }
 
+void usage(){
+    printf("syntax : 1m-block <site list file>\n");
+    printf("sample : 1m-block top-1m.csv\n");
+    return;
+}
+
 int main(int argc, char *argv[]) {
 
     printf("init for net-filter lib\n");
-
-    system("iptables -A OUTPUT -j NFQUEUE --queue-num 0");
-    system("iptables -A INPUT -j NFQUEUE --queue-num 0");
+    init_pro();
 
     signal(SIGINT, sig_handler);
 
@@ -115,10 +122,10 @@ int main(int argc, char *argv[]) {
     int rv;
     char buf[4096] __attribute__ ((aligned));
 
-    if (argc < 2) {
-        std::cerr << "사용법: " << argv[0] << " <차단할 사이트 목록 파일(csv)>" << std::endl;
-        return 1;
-    }
+    if (argc < 2){
+        usage();
+        return 0;
+    } 
 
     load_blocked_sites(argv[1]);
 
@@ -142,6 +149,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("binding this socket to queue '0'\n");
+
     qh = nfq_create_queue(h, 0, cb, NULL);
 
     if (!qh) {
