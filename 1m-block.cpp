@@ -1,6 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <cstring>
+#include <fstream>
+#include <unordered_set>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -10,11 +11,26 @@
 #include <libnet.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <signal.h>
 
 #define NF_DROP 0
 #define NF_ACCEPT 1
 
-char* hostname;
+using namespace std;
+
+unordered_set<string> blocked_sites;
+
+void load_blocked_sites(const char *filename) {
+    std::ifstream file(filename);
+    std::string line;
+    while (std::getline(file, line)) {
+        size_t comma_pos = line.find(",");
+        if (comma_pos != std::string::npos) {
+            blocked_sites.insert(line.substr(comma_pos + 1));
+        }
+    }
+    file.close();
+}
 
 void dump(unsigned char* buf, int size) {
     int i;
@@ -32,8 +48,7 @@ static u_int32_t print_pkt(struct nfq_data *tb) {
     return ntohl(ph->packet_id);
 }
 
-static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, 
-                struct nfq_data *nfa, void *data){
+static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data){
 
     u_int32_t id = print_pkt(nfa);
     unsigned int packetlen;
@@ -55,33 +70,57 @@ static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
     if(!(packetlen>total_hdr_len+4 && packet[total_hdr_len]=='G'&&packet[total_hdr_len+1]=='E'&&packet[total_hdr_len+2]=='T'))
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
-    char *findhost = strstr((const char *)(packet + total_hdr_len), "Host: ");
+    char *findhost = strstr((char *)(packet + total_hdr_len), "Host: ");
     
     if(!findhost)
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 
     findhost+=6; //"Host: "
-    char* hostend = strchr(findhost, '\r');
+    char* hostend = strstr(findhost, "\r\n");
+
     if(!hostend)
         return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
-    *hostend = '\0';
 
-    // 입력받은 유해사이트와 비교
-    if(strcmp(findhost, hostname)==0){
-        printf("block %s\n", hostname);
+    string hostname(findhost, hostend - findhost); 
+
+    //site compare
+    printf("site compare\n");
+    printf("%s!!\n", hostname.c_str()); // 수정된 부분
+
+    if(blocked_sites.find(hostname) != blocked_sites.end()){ // 수정된 부분
+        printf("block %s\n", hostname.c_str());
         return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
     }
     return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
+void sig_handler(int signum){
+    system("iptables -F");
+    printf("terminate system\n");
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
+
+    printf("init for net-filter lib\n");
+
+    system("iptables -A OUTPUT -j NFQUEUE --queue-num 0");
+    system("iptables -A INPUT -j NFQUEUE --queue-num 0");
+
+    signal(SIGINT, sig_handler);
+
     struct nfq_handle *h;
     struct nfq_q_handle *qh;
     int fd;
     int rv;
     char buf[4096] __attribute__ ((aligned));
 
-    hostname = argv[1];
+    if (argc < 2) {
+        std::cerr << "사용법: " << argv[0] << " <차단할 사이트 목록 파일(csv)>" << std::endl;
+        return 1;
+    }
+
+    load_blocked_sites(argv[1]);
 
     printf("opening library handle\n");
     h = nfq_open();

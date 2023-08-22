@@ -1,15 +1,15 @@
-CC=gcc
+CC=g++
 CFLAGS=-Wall
 LIBS=-lnetfilter_queue
-TARGET=netfilter-test
+TARGET=1m-block
 
 all: $(TARGET)
 
-$(TARGET): netfilter-test.o
-	$(CC) $(CFLAGS) -o $(TARGET) netfilter-test.o $(LIBS)
+$(TARGET): 1m-block.o
+	$(CC) $(CFLAGS) -o $(TARGET) 1m-block.o $(LIBS)
 
-netfilter-test.o: netfilter-test.c
-	$(CC) $(CFLAGS) -c netfilter-test.c
+1m-block.o: 1m-block.cpp
+	$(CC) $(CFLAGS) -c 1m-block.cpp
 
 .PHONY: clean
 
